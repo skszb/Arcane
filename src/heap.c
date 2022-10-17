@@ -9,6 +9,7 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <DbgHelp.h>
 
 typedef struct arena_t
 {
@@ -85,8 +86,61 @@ void heap_free(heap_t* heap, void* address)
 	mutex_unlock(heap->mutex);
 }
 
+// Special walker function used for reporting leak size and callstack
+#define BACK_TRACE_MAX_NUM 16
+#define FRAME_SKIP 4	// skip to where the leak happens
+#define CALLER_NAME_MAX 32	// the size of the buffer that holds the caller's name
+void report_leak_walker(void* ptr, size_t size, int used, void* user)
+{
+	if (used)
+	{
+		static const double byte_size = 1024;
+		double bytes = size / byte_size;
+		printf("Memory leak of size %.2f bytes with callstack:\n", bytes);
+		PVOID back_trace[BACK_TRACE_MAX_NUM];
+		USHORT stack_num = CaptureStackBackTrace(FRAME_SKIP, BACK_TRACE_MAX_NUM, back_trace, NULL);
+
+		HANDLE process = GetCurrentProcess();
+		SymInitialize(process, NULL, TRUE);
+		IMAGEHLP_SYMBOL* symbol = (IMAGEHLP_SYMBOL*)malloc(sizeof(IMAGEHLP_SYMBOL64) + (CALLER_NAME_MAX) * sizeof(CHAR));
+		symbol->SizeOfStruct = sizeof(IMAGEHLP_SYMBOL64);
+		symbol->Size = 0;
+		symbol->MaxNameLength = CALLER_NAME_MAX;
+
+		for (USHORT frame_num = 0; frame_num < stack_num; frame_num++)
+		{
+			DWORD64 address = (DWORD64)back_trace[frame_num];
+			SymGetSymFromAddr64(process, address, NULL, symbol);
+			printf("[%d] = %s\n", frame_num, symbol->Name);
+
+			if (strcmp(symbol->Name, "main") == 0) break;
+		}
+		free(symbol);
+		SymCleanup(process);
+	}
+}
+
+// Walk through each block in the heap (both tlsf_pool and arena) and report unfreed blocks of memory
+void heap_report_leak(heap_t* heap)
+{
+
+	pool_t tlsf_pool = tlsf_get_pool(heap->tlsf);
+	tlsf_walk_pool(tlsf_pool, report_leak_walker, NULL);
+
+	arena_t* arena = heap->arena;
+	while (arena)
+	{
+		tlsf_walk_pool(arena->pool, report_leak_walker, NULL);
+		arena = arena->next;
+	}
+
+}
+
 void heap_destroy(heap_t* heap)
 {
+	// detect and report leak before destroy
+	heap_report_leak(heap);
+
 	tlsf_destroy(heap->tlsf);
 
 	arena_t* arena = heap->arena;

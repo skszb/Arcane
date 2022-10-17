@@ -6,6 +6,7 @@
 #include "thread.h"
 
 #include <string.h>
+#include "lz4/lz4.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -87,11 +88,20 @@ fs_work_t* fs_write(fs_t* fs, const char* path, const void* buffer, size_t size,
 	if (use_compression)
 	{
 		// HOMEWORK 2: Queue file write work on compression queue!
+		// create a buffer to store the compressed data and its meta data(at the head of file), 
+		// free it after writing is finished.
+		const size_t meta_data_size = sizeof(size);
+		const size_t compressed_data_size = LZ4_compressBound((int)size);
+		const size_t compression_buffer_size = compressed_data_size + meta_data_size;
+		size_t* compression_buffer = heap_alloc(fs->heap, compression_buffer_size, 8);
+		compression_buffer[0] = size;
+		size_t actual_written_size = LZ4_compress_default(buffer, (char*)(compression_buffer + 1), (int)size, (int)compression_buffer_size);
+
+		work->size = actual_written_size + meta_data_size;
+		work->buffer = compression_buffer;
 	}
-	else
-	{
-		queue_push(fs->file_queue, work);
-	}
+	queue_push(fs->file_queue, work);
+
 
 	return work;
 }
@@ -176,21 +186,31 @@ static void file_read(fs_work_t* work)
 	}
 
 	work->size = bytes_read;
-	if (work->null_terminate)
-	{
-		((char*)work->buffer)[bytes_read] = 0;
-	}
 
 	CloseHandle(handle);
 
 	if (work->use_compression)
 	{
 		// HOMEWORK 2: Queue file read work on decompression queue!
+		const size_t meta_data_size = sizeof(work->size);
+		size_t* compressed_data = (size_t*)(work->buffer);
+		size_t decompressed_data_size = compressed_data[0];
+
+		char* decompressed_data = heap_alloc(work->heap, decompressed_data_size+sizeof('\0'), 8);
+		size_t actual_data_size = LZ4_decompress_safe((char*)(compressed_data + 1), decompressed_data,
+			(int)(work->size - meta_data_size), (int)decompressed_data_size);
+		heap_free(work->heap, work->buffer);
+		work->buffer = decompressed_data;
+		work->size = actual_data_size;
 	}
-	else
+
+	if (work->null_terminate)
 	{
-		event_signal(work->done);
+		((char*)work->buffer)[work->size] = 0;
 	}
+
+	event_signal(work->done);
+
 }
 
 int get_hash(void* address, int bucket_count)
@@ -231,6 +251,11 @@ static void file_write(fs_work_t* work)
 
 	CloseHandle(handle);
 
+	// HOMEWORK 2: Queue file write work on compression queue!
+	if (work->use_compression)
+	{
+		heap_free(work->heap, work->buffer);
+	}
 	event_signal(work->done);
 }
 
@@ -244,7 +269,7 @@ static int file_thread_func(void* user)
 		{
 			break;
 		}
-		
+
 		switch (work->op)
 		{
 		case k_fs_work_op_read:

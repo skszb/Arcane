@@ -1,5 +1,3 @@
-#pragma once
-
 #include <stdlib.h>
 
 // Heap Memory Manager
@@ -23,3 +21,8 @@ void* heap_alloc(heap_t* heap, size_t size, size_t alignment);
 
 // Free memory previously allocated from a heap.
 void heap_free(heap_t* heap, void* address);
+
+
+//Debugging
+void report_leak_walker(void* ptr, size_t size, int used, void* user);
+void heap_report_leak(heap_t* heap);
