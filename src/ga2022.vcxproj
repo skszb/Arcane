@@ -42,7 +42,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
@@ -152,9 +152,11 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="atomic.c" />
+    <ClCompile Include="cpp_test.cpp" />
     <ClCompile Include="debug.c" />
     <ClCompile Include="ecs.c" />
     <ClCompile Include="event.c" />
+    <ClCompile Include="frogger_game.c" />
     <ClCompile Include="fs.c" />
     <ClCompile Include="gpu.c" />
     <ClCompile Include="heap.c" />
@@ -180,9 +182,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="atomic.h" />
+    <ClInclude Include="cpp_test.h" />
     <ClInclude Include="debug.h" />
     <ClInclude Include="ecs.h" />
     <ClInclude Include="event.h" />
+    <ClInclude Include="frogger_game.h" />
     <ClInclude Include="fs.h" />
     <ClInclude Include="gpu.h" />
     <ClInclude Include="heap.h" />
