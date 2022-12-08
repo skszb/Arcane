@@ -144,6 +144,7 @@ void fs_work_destroy(fs_work_t* work)
 		event_wait(work->done);
 		event_destroy(work->done);
 		heap_free(work->heap, work);
+		heap_free(work->heap, work->buffer);
 	}
 }
 

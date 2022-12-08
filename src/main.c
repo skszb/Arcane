@@ -15,11 +15,11 @@ int main(int argc, const char* argv[])
 
 	timer_startup();
 
-	cpp_test_function(42);
-
 	heap_t* heap = heap_create(2 * 1024 * 1024);
 	fs_t* fs = fs_create(heap, 8);
 	wm_window_t* window = wm_create(heap);
+
+#if 1
 	render_t* render = render_create(heap, window);
 
 	simple_game_t* game = frogger_game_create(heap, fs, window, render);
@@ -28,12 +28,17 @@ int main(int argc, const char* argv[])
 	{
 		frogger_game_update(game);
 	}
+	
 
 	/* XXX: Shutdown render before the game. Render uses game resources. */
+	
 	render_destroy(render);
 
 	frogger_game_destroy(game);
+	
+#endif
 
+	// ************************* end *******************************
 	wm_destroy(window);
 	fs_destroy(fs);
 	heap_destroy(heap);

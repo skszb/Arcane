@@ -160,8 +160,9 @@ void heap_report_leak(heap_t* heap)
 void heap_destroy(heap_t* heap)
 {
 	// detect and report leak before destroy
+	printf("Detecting memory leak...\n");
 	heap_report_leak(heap);
-
+	printf("Memory leak detection finished\n");
 	tlsf_destroy(heap->tlsf);
 
 	arena_t* arena = heap->arena;

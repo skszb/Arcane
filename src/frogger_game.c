@@ -6,6 +6,7 @@
 #include "timer_object.h"
 #include "transform.h"
 #include "wm.h"
+#include "audio.h"
 #include <stdio.h>
 
 #define _USE_MATH_DEFINES
@@ -68,6 +69,10 @@ typedef struct frogger_game_t
 	render_t* render;
 
 	timer_object_t* timer;
+
+	audio_t* bgm;
+	audio_t* crash;
+	audio_t* finish;
 
 	ecs_t* ecs;
 	int transform_type;
@@ -165,17 +170,25 @@ frogger_game_t* frogger_game_create(heap_t* heap, fs_t* fs, wm_window_t* window,
 	game->game_data.car_size_min[2].y = 2.5f;
 	game->game_data.car_size_max[2].y = 4.5f;
 
+	init_audio_engine();
+	game->bgm = read_audio_file(heap, "audios/bgm.mp3");
+	game->bgm->loop = 1;
+	game->bgm->volume = 2;
+	game->crash = read_audio_file(heap, "audios/VOXScrm_Wilhelm scream (ID 0477)_BSB.wav");
+	game->finish = read_audio_file(heap, "audios/success-fanfare-trumpets-6185.mp3");
 
 	load_resources(game);
 	spawn_player(game);
 	spawn_traffic(game);
 	spawn_camera(game);
 
+	play_audio(game->bgm);
 	return game;
 }
 
 void frogger_game_destroy(frogger_game_t* game)
 {
+	uninit_audio_engine();
 	ecs_destroy(game->ecs);
 	timer_object_destroy(game->timer);
 	unload_resources(game);
@@ -205,7 +218,6 @@ static void load_resources(frogger_game_t* game)
 		.uniform_buffer_count = 1,
 	};
 
-	// original -------------------------------------------------------------------------------------------
 	static vec3f_t square_verts[] =
 	{
 		{ -1.0f, -1.0f,  1.0f }, { 0.0f, 1.0f,  1.0f },
@@ -242,7 +254,6 @@ static void load_resources(frogger_game_t* game)
 		.index_data_size = sizeof(square_indices),
 	};
 
-	// mine -------------------------------------------------------------------------------------------
 }
 
 static void unload_resources(frogger_game_t* game)
@@ -291,7 +302,8 @@ static void spawn_traffic(frogger_game_t* game)
 			transform_comp->transform.translation = game->game_data.traffic_starts[t];
 
 			int dir = (int) (game->game_data.traffic_velocity[t].y / fabs(game->game_data.traffic_velocity[t].y));
-			transform_comp->transform.translation.y += dir * 12 * c ;
+			float dist_between_lane = 12;
+			transform_comp->transform.translation.y += dir * dist_between_lane * c ; 
 
 			for (int i = 0; i < 3; i++)
 			{
@@ -341,6 +353,13 @@ static void update_player(frogger_game_t* game)
 	// respawn player when reaches finish line
 	if (player_transform_comp->transform.translation.z < game->game_data.player_finish_z)
 	{
+		play_audio(game->finish);
+		player_transform_comp->transform.translation = game->game_data.player_spawn_pos;
+	}
+
+	// respawn player is outside of screen
+	if (player_transform_comp->transform.translation.z > game->game_data.player_spawn_pos.z)
+	{
 		player_transform_comp->transform.translation = game->game_data.player_spawn_pos;
 	}
 	 
@@ -367,6 +386,7 @@ static void update_player(frogger_game_t* game)
 					player_corners[i].z < car_corners[3].z)
 				{
 					player_transform_comp->transform.translation = game->game_data.player_spawn_pos;
+					play_audio(game->crash);
 					collide = true;
 					break;
 				}
